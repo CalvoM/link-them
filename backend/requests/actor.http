@@ -1,0 +1,12 @@
+##single-actor
+GET /3/person/11?language=en-US HTTP/1.1
+Accept: application/json
+Authorization: Bearer {{TOKEN}}
+Host: api.themoviedb.org
+
+
+###single-actor-credits
+GET /3/person/16270/movie_credits?language=en-US HTTP/1.1
+Accept: application/json
+Authorization: Bearer {{TOKEN}}
+Host: api.themoviedb.org

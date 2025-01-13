@@ -1,0 +1,5 @@
+GET /3/movie/123?language=en-US&append_to_response=credits HTTP/1.1
+Accept: application/json
+Authorization: Bearer {{TOKEN}}
+Host: api.themoviedb.org
+
