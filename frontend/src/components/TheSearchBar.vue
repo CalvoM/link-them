@@ -36,9 +36,13 @@ function getActors(event: AutoCompleteCompleteEvent) {
       />
       <label for="srcActor">Starting Actor</label>
     </FloatLabel>
-    <Message icon="pi pi-times-circle" severity="error" v-if="!srcActor && clickedSubmit" id="msg1"
-      >Actor is needed</Message
-    >
+    <Message
+      icon="pi pi-times-circle"
+      severity="error"
+      v-if="!srcActor && clickedSubmit"
+      id="msg1"
+      >Actor is needed
+    </Message>
     <FloatLabel variant="on" class="flex-none">
       <AutoComplete
         inputId="destActor"
@@ -50,9 +54,13 @@ function getActors(event: AutoCompleteCompleteEvent) {
       />
       <label for="destActor">Final Actor</label>
     </FloatLabel>
-    <Message icon="pi pi-times-circle" severity="error" v-if="!destActor && clickedSubmit" id="msg2"
-      >Actor is needed</Message
-    >
+    <Message
+      icon="pi pi-times-circle"
+      severity="error"
+      v-if="!destActor && clickedSubmit"
+      id="msg2"
+      >Actor is needed
+    </Message>
     <Button
       label="Find link"
       aria-label="Search"
