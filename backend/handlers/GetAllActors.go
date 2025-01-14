@@ -8,8 +8,8 @@ import (
 )
 
 func (h handler) GetAllActors(w http.ResponseWriter, r *http.Request) {
-	var actors []models.ActorDetails
-	result := h.dbClient.Table("actors").Select("name", "tmdb_id").Find(&actors)
+	var actors []models.ActorResultDetails
+	result := h.dbClient.Table("actors").Select([]string{"name", "id", "details->>'profile_picture' as profile_picture"}).Scan(&actors)
 	if result.Error != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("500 Internal Server Error"))

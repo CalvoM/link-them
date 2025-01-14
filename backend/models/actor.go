@@ -10,5 +10,9 @@ type Actor struct {
 
 type ActorDetails struct {
 	Name    string `json:"name"`
-	ActorID uint   `json:"id" gorm:"column:tmdb_id;unique"`
+	ActorID uint   `json:"id"`
+}
+type ActorResultDetails struct {
+	ActorDetails
+	ProfilePicture string `json:"profile_picture"`
 }
