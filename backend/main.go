@@ -15,7 +15,8 @@ func main() {
 	log.Debug().Msg("Initializing Link Them Backend.")
 	h := handlers.New(db.Init())
 	r := mux.NewRouter()
-	r.HandleFunc("/actors", h.GetAllActors).Methods(http.MethodGet)
+	apiV1 := r.PathPrefix("/api/v1").Subrouter()
+	apiV1.HandleFunc("/actors", h.GetAllActors).Methods(http.MethodGet)
 	srv := &http.Server{
 		Handler: r,
 		Addr:    "127.0.0.1:4009",

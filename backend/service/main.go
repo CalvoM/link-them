@@ -22,8 +22,8 @@ func main() {
 	}
 	dbClient := DBInit()
 	token := os.Getenv("TOKEN")
-	personID := 1000
-	for personID < 10000 {
+	personID := 44854
+	for personID < 50000 {
 		url := fmt.Sprintf("https://api.themoviedb.org/3/person/%s?language=en-US", strconv.Itoa(personID))
 		req, _ := http.NewRequest("GET", url, nil)
 
