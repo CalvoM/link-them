@@ -11,20 +11,27 @@ import (
 	"github.com/CalvoM/link-them/models"
 	"github.com/joho/godotenv"
 	"github.com/rs/zerolog/log"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type MyJson map[string]any
 
-func main() {
-	err := godotenv.Load("../.env")
-	if err != nil {
-		log.Fatal().Msg(err.Error())
-	}
-	dbClient := DBInit()
-	token := os.Getenv("TOKEN")
-	personID := 44854
-	for personID < 50000 {
-		url := fmt.Sprintf("https://api.themoviedb.org/3/person/%s?language=en-US", strconv.Itoa(personID))
+var (
+	dbClient *gorm.DB
+	token    string
+)
+
+var (
+	baseActorDetailsURL  string = "https://api.themoviedb.org/3/person/%s?language=en-US&append_to_response=credits"
+	baseMovieDetailsURL  string = "https://api.themoviedb.org/3/movie/%s?language=en-US&append_to_response=credits"
+	baseCreditDetailsURL string = "https://api.themoviedb.org/3/credit/%s"
+)
+
+func scrapActors() {
+	personID := 70000
+	for personID < 80000 {
+		url := fmt.Sprintf(baseActorDetailsURL, strconv.Itoa(personID))
 		req, _ := http.NewRequest("GET", url, nil)
 
 		req.Header.Add("accept", "application/json")
@@ -58,12 +65,153 @@ func main() {
 				bufJson["profile_path"] = ""
 			}
 			details["profile_picture"] = bufJson["profile_path"].(string)
+			details["credits"] = bufJson["credits"]
 			actor.Details = details
-			result := dbClient.Create(&actor)
+			result := dbClient.Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "tmdb_id"}}, DoUpdates: clause.Assignments(MyJson{"details": details})}).Create(&actor)
 			if result.Error != nil {
-				log.Error().Msg("Failed to create the actor.")
+				log.Error().Msg(fmt.Sprintf("Failed to create the actor. %s", result.Error.Error()))
 			}
 		}
 		personID++
 	}
+}
+
+func scrapMovies() {
+	movieID := 30853
+	for movieID < 50000 {
+		url := fmt.Sprintf(baseMovieDetailsURL, strconv.Itoa(movieID))
+		req, _ := http.NewRequest("GET", url, nil)
+		req.Header.Add("accept", "application/json")
+		req.Header.Add("Authorization", "Bearer "+token)
+
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			log.Fatal().Msg(err.Error())
+		}
+
+		defer res.Body.Close()
+		if res.Status == "200 OK" {
+			body, _ := io.ReadAll(res.Body)
+			var bufJson MyJson
+			json.Unmarshal(body, &bufJson)
+			var movie models.Movie
+			movie.Title = bufJson["title"].(string)
+			movie.MovieID = uint(bufJson["id"].(float64))
+			log.Info().Msg(fmt.Sprintf("Found movie ID %d", movie.MovieID))
+			details := make(map[string]any)
+			details["credits"] = bufJson["credits"]
+			if bufJson["status"] == nil {
+				// Default to released
+				bufJson["status"] = "Released"
+			}
+			details["status"] = bufJson["status"]
+			if bufJson["budget"] == nil {
+				bufJson["budget"] = 0
+			}
+			details["budget"] = bufJson["budget"]
+			if bufJson["revenue"] == nil {
+				bufJson["revenue"] = 0
+			}
+			details["revenue"] = bufJson["revenue"]
+			if bufJson["poster_path"] == nil {
+				bufJson["poster_path"] = ""
+			}
+			details["poster_picture"] = bufJson["poster_path"].(string)
+			details["credits"] = bufJson["credits"]
+			movie.Details = details
+			result := dbClient.Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "tmdb_id"}}, DoUpdates: clause.Assignments(MyJson{"details": details})}).Create(&movie)
+			if result.Error != nil {
+				log.Error().Msg(fmt.Sprintf("Failed to create the movie. %s", result.Error.Error()))
+			}
+		} else {
+			log.Info().Msg(res.Status)
+		}
+		movieID++
+	}
+}
+
+func scrapCreditsFromActors() {
+	// CreditID is some random string
+	var creditsIDs []string
+	result := dbClient.Table("actors").Select("jsonb_path_query(details, '$.credits.cast[*].credit_id')").Scan(&creditsIDs)
+	if result.Error != nil {
+		log.Info().Msg(result.Error.Error())
+	}
+	for _, creditID := range creditsIDs {
+		creditID = creditID[1 : len(creditID)-1]
+		url := fmt.Sprintf(baseCreditDetailsURL, creditID)
+		req, _ := http.NewRequest("GET", url, nil)
+		req.Header.Add("accept", "application/json")
+		req.Header.Add("Authorization", "Bearer "+token)
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			log.Fatal().Msg(err.Error())
+		}
+
+		defer res.Body.Close()
+		if res.Status == "200 OK" {
+			log.Info().Msg(fmt.Sprintf("Found %s", creditID))
+			body, _ := io.ReadAll(res.Body)
+			var bufJson MyJson
+			json.Unmarshal(body, &bufJson)
+			var credit models.Credit
+			credit.CreditID = bufJson["id"].(string)
+			credit.Details = bufJson
+			result := dbClient.Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "tmdb_id"}}, DoUpdates: clause.Assignments(MyJson{"details": credit.Details})}).Create(&credit)
+			if result.Error != nil {
+				log.Error().Msg(fmt.Sprintf("Failed to create the credit. %s", result.Error.Error()))
+			}
+		} else {
+			log.Info().Msg(res.Status)
+		}
+	}
+}
+
+func scrapCreditsFromMovies() {
+	// CreditID is some random string
+	var creditsIDs []string
+	result := dbClient.Table("movies").Select("jsonb_path_query(details, '$.credits.cast[*].credit_id');").Scan(&creditsIDs)
+	if result.Error != nil {
+		log.Info().Msg(result.Error.Error())
+	}
+	for _, creditID := range creditsIDs {
+		creditID = creditID[1 : len(creditID)-1]
+		url := fmt.Sprintf(baseCreditDetailsURL, creditID)
+		req, _ := http.NewRequest("GET", url, nil)
+		req.Header.Add("accept", "application/json")
+		req.Header.Add("Authorization", "Bearer "+token)
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			log.Fatal().Msg(err.Error())
+		}
+
+		defer res.Body.Close()
+		if res.Status == "200 OK" {
+			log.Info().Msg(fmt.Sprintf("Found %s", creditID))
+			body, _ := io.ReadAll(res.Body)
+			var bufJson MyJson
+			json.Unmarshal(body, &bufJson)
+			var credit models.Credit
+			credit.CreditID = bufJson["id"].(string)
+			credit.Details = bufJson
+			result := dbClient.Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "tmdb_id"}}, DoUpdates: clause.Assignments(MyJson{"details": credit.Details})}).Create(&credit)
+			if result.Error != nil {
+				log.Error().Msg(fmt.Sprintf("Failed to create the credit. %s", result.Error.Error()))
+			}
+		} else {
+			log.Info().Msg(res.Status)
+		}
+	}
+}
+
+func main() {
+	err := godotenv.Load("../.env")
+	if err != nil {
+		log.Fatal().Msg(err.Error())
+	}
+	dbClient = DBInit()
+	token = os.Getenv("TOKEN")
+	// scrapActors()
+	// scrapMovies()
+	scrapCreditsFromActors()
 }

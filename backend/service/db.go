@@ -28,5 +28,7 @@ func DBInit() *gorm.DB {
 	}
 	log.Info().Msg("DB Initialization successful.")
 	dbClient.AutoMigrate(&models.Actor{})
+	dbClient.AutoMigrate(&models.Movie{})
+	dbClient.AutoMigrate(&models.Credit{})
 	return dbClient
 }
