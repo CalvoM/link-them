@@ -10,7 +10,7 @@ type Actor struct {
 
 type ActorDetails struct {
 	Name    string `json:"name"`
-	ActorID uint   `json:"id"`
+	ActorID uint   `json:"id" gorm:"column:tmdb_id;uniqueIndex"`
 }
 type ActorResultDetails struct {
 	ActorDetails
