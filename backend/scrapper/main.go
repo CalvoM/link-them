@@ -6,11 +6,14 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"slices"
 	"strconv"
+	"sync"
 
 	"github.com/CalvoM/link-them/models"
 	"github.com/joho/godotenv"
 	"github.com/rs/zerolog/log"
+	"github.com/samber/lo"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -137,33 +140,50 @@ func scrapCreditsFromActors() {
 	if result.Error != nil {
 		log.Info().Msg(result.Error.Error())
 	}
-	for _, creditID := range creditsIDs {
-		creditID = creditID[1 : len(creditID)-1]
-		url := fmt.Sprintf(baseCreditDetailsURL, creditID)
-		req, _ := http.NewRequest("GET", url, nil)
-		req.Header.Add("accept", "application/json")
-		req.Header.Add("Authorization", "Bearer "+token)
-		res, err := http.DefaultClient.Do(req)
-		if err != nil {
-			log.Fatal().Msg(err.Error())
-		}
+	creditsIDs = lo.Map(creditsIDs, func(id string, index int) string { return id[1 : len(id)-1] })
 
-		defer res.Body.Close()
-		if res.Status == "200 OK" {
-			log.Info().Msg(fmt.Sprintf("Found %s", creditID))
-			body, _ := io.ReadAll(res.Body)
-			var bufJson MyJson
-			json.Unmarshal(body, &bufJson)
-			var credit models.Credit
-			credit.CreditID = bufJson["id"].(string)
-			credit.Details = bufJson
-			result := dbClient.Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "tmdb_id"}}, DoUpdates: clause.Assignments(MyJson{"details": credit.Details})}).Create(&credit)
-			if result.Error != nil {
-				log.Error().Msg(fmt.Sprintf("Failed to create the credit. %s", result.Error.Error()))
+	var savedCreditIDs []string
+	result = dbClient.Table("credits").Select([]string{"tmdb_id"}).Scan(&savedCreditIDs)
+	if result.Error != nil {
+		log.Info().Msg(result.Error.Error())
+	}
+	remainingCreditIDs := lo.Filter(creditsIDs, func(id string, index int) bool { return slices.Contains(savedCreditIDs, id) == false })
+	creditsIDsChunks := slices.Chunk(remainingCreditIDs, 2000)
+	log.Info().Msg("Data is setup")
+	var wg sync.WaitGroup
+	for chunk := range creditsIDsChunks {
+		wg.Add(1)
+		log.Info().Msg("Wg Added")
+		go func() {
+			defer wg.Done()
+			for _, creditID := range chunk {
+				url := fmt.Sprintf(baseCreditDetailsURL, creditID)
+				req, _ := http.NewRequest("GET", url, nil)
+				req.Header.Add("accept", "application/json")
+				req.Header.Add("Authorization", "Bearer "+token)
+				res, err := http.DefaultClient.Do(req)
+				if err != nil {
+					log.Fatal().Msg(err.Error())
+				}
+
+				defer res.Body.Close()
+				if res.Status == "200 OK" {
+					log.Info().Msg(fmt.Sprintf("Found %s", creditID))
+					body, _ := io.ReadAll(res.Body)
+					var bufJson MyJson
+					json.Unmarshal(body, &bufJson)
+					var credit models.Credit
+					credit.CreditID = bufJson["id"].(string)
+					credit.Details = bufJson
+					result := dbClient.Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "tmdb_id"}}, DoUpdates: clause.Assignments(MyJson{"details": credit.Details})}).Create(&credit)
+					if result.Error != nil {
+						log.Error().Msg(fmt.Sprintf("Failed to create the credit. %s", result.Error.Error()))
+					}
+				} else {
+					log.Info().Msg(res.Status)
+				}
 			}
-		} else {
-			log.Info().Msg(res.Status)
-		}
+		}()
 	}
 }
 
