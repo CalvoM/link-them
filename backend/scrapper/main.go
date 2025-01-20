@@ -9,11 +9,11 @@ import (
 	"slices"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/CalvoM/link-them/models"
 	"github.com/joho/godotenv"
 	"github.com/rs/zerolog/log"
-	"github.com/samber/lo"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -47,7 +47,7 @@ func scrapActors() {
 
 		defer res.Body.Close()
 		log.Info().Msg(res.Status)
-		if res.Status == "200 OK" {
+		if res.StatusCode == http.StatusOK {
 			body, _ := io.ReadAll(res.Body)
 			var bufJson MyJson
 			json.Unmarshal(body, &bufJson)
@@ -93,7 +93,7 @@ func scrapMovies() {
 		}
 
 		defer res.Body.Close()
-		if res.Status == "200 OK" {
+		if res.StatusCode == http.StatusOK {
 			body, _ := io.ReadAll(res.Body)
 			var bufJson MyJson
 			json.Unmarshal(body, &bufJson)
@@ -134,94 +134,117 @@ func scrapMovies() {
 }
 
 func scrapCreditsFromActors() {
-	// CreditID is some random string
-	var creditsIDs []string
-	result := dbClient.Table("actors").Select("jsonb_path_query(details, '$.credits.cast[*].credit_id')").Scan(&creditsIDs)
+	var remainingCreditIDs []string
+	query := "select jsonb_path_query(details, '$.credits.cast[*].credit_id')->>0 from actors except tmdb_id from credits;"
+	result := dbClient.Raw(query).Scan(&remainingCreditIDs)
 	if result.Error != nil {
 		log.Info().Msg(result.Error.Error())
 	}
-	creditsIDs = lo.Map(creditsIDs, func(id string, index int) string { return id[1 : len(id)-1] })
 
-	var savedCreditIDs []string
-	result = dbClient.Table("credits").Select([]string{"tmdb_id"}).Scan(&savedCreditIDs)
-	if result.Error != nil {
-		log.Info().Msg(result.Error.Error())
-	}
-	remainingCreditIDs := lo.Filter(creditsIDs, func(id string, index int) bool { return slices.Contains(savedCreditIDs, id) == false })
-	creditsIDsChunks := slices.Chunk(remainingCreditIDs, 2000)
-	log.Info().Msg("Data is setup")
+	creditsIDsChunks := slices.Chunk(remainingCreditIDs, 3000)
 	var wg sync.WaitGroup
+	wgCountLimit := 50
 	for chunk := range creditsIDsChunks {
-		wg.Add(1)
-		log.Info().Msg("Wg Added")
-		go func() {
-			defer wg.Done()
-			for _, creditID := range chunk {
-				url := fmt.Sprintf(baseCreditDetailsURL, creditID)
-				req, _ := http.NewRequest("GET", url, nil)
-				req.Header.Add("accept", "application/json")
-				req.Header.Add("Authorization", "Bearer "+token)
-				res, err := http.DefaultClient.Do(req)
-				if err != nil {
-					log.Fatal().Msg(err.Error())
-				}
-
-				defer res.Body.Close()
-				if res.Status == "200 OK" {
-					log.Info().Msg(fmt.Sprintf("Found %s", creditID))
-					body, _ := io.ReadAll(res.Body)
-					var bufJson MyJson
-					json.Unmarshal(body, &bufJson)
-					var credit models.Credit
-					credit.CreditID = bufJson["id"].(string)
-					credit.Details = bufJson
-					result := dbClient.Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "tmdb_id"}}, DoUpdates: clause.Assignments(MyJson{"details": credit.Details})}).Create(&credit)
-					if result.Error != nil {
-						log.Error().Msg(fmt.Sprintf("Failed to create the credit. %s", result.Error.Error()))
+		if wgCountLimit > 0 {
+			wg.Add(1)
+			wgCountLimit--
+			go func() {
+				defer func() {
+					defer wg.Done()
+					wgCountLimit++
+				}()
+				for _, creditID := range chunk {
+					url := fmt.Sprintf(baseCreditDetailsURL, creditID)
+					req, _ := http.NewRequest("GET", url, nil)
+					req.Header.Add("accept", "application/json")
+					req.Header.Add("Authorization", "Bearer "+token)
+					res, err := http.DefaultClient.Do(req)
+					if err != nil {
+						log.Fatal().Msg(err.Error())
 					}
-				} else {
-					log.Info().Msg(res.Status)
+
+					defer res.Body.Close()
+					if res.StatusCode == http.StatusOK {
+						log.Info().Msg(fmt.Sprintf("Found %s", creditID))
+						body, _ := io.ReadAll(res.Body)
+						var bufJson MyJson
+						json.Unmarshal(body, &bufJson)
+						var credit models.Credit
+						credit.CreditID = bufJson["id"].(string)
+						credit.Details = bufJson
+						result := dbClient.Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "tmdb_id"}}, DoUpdates: clause.Assignments(MyJson{"details": credit.Details})}).Create(&credit)
+						if result.Error != nil {
+							log.Error().Msg(fmt.Sprintf("Failed to create the credit. %s", result.Error.Error()))
+						}
+					} else {
+						log.Info().Msg(res.Status)
+						if res.StatusCode == http.StatusTooManyRequests {
+							return
+						}
+					}
+					time.Sleep(10 * time.Millisecond)
 				}
-			}
-		}()
+			}()
+		}
 	}
+	wg.Wait()
 }
 
 func scrapCreditsFromMovies() {
-	// CreditID is some random string
-	var creditsIDs []string
-	result := dbClient.Table("movies").Select("jsonb_path_query(details, '$.credits.cast[*].credit_id');").Scan(&creditsIDs)
+	var remainingCreditIDs []string
+	query := "select jsonb_path_query(details, '$.credits.cast[*].credit_id')->>0 from movies except select tmdb_id from credits;"
+	result := dbClient.Raw(query).Scan(&remainingCreditIDs)
 	if result.Error != nil {
 		log.Info().Msg(result.Error.Error())
 	}
-	for _, creditID := range creditsIDs {
-		creditID = creditID[1 : len(creditID)-1]
-		url := fmt.Sprintf(baseCreditDetailsURL, creditID)
-		req, _ := http.NewRequest("GET", url, nil)
-		req.Header.Add("accept", "application/json")
-		req.Header.Add("Authorization", "Bearer "+token)
-		res, err := http.DefaultClient.Do(req)
-		if err != nil {
-			log.Fatal().Msg(err.Error())
-		}
 
-		defer res.Body.Close()
-		if res.Status == "200 OK" {
-			log.Info().Msg(fmt.Sprintf("Found %s", creditID))
-			body, _ := io.ReadAll(res.Body)
-			var bufJson MyJson
-			json.Unmarshal(body, &bufJson)
-			var credit models.Credit
-			credit.CreditID = bufJson["id"].(string)
-			credit.Details = bufJson
-			result := dbClient.Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "tmdb_id"}}, DoUpdates: clause.Assignments(MyJson{"details": credit.Details})}).Create(&credit)
-			if result.Error != nil {
-				log.Error().Msg(fmt.Sprintf("Failed to create the credit. %s", result.Error.Error()))
-			}
-		} else {
-			log.Info().Msg(res.Status)
+	creditsIDsChunks := slices.Chunk(remainingCreditIDs, 4000)
+	var wg sync.WaitGroup
+	wgCountLimit := 50
+	for chunk := range creditsIDsChunks {
+		if wgCountLimit > 0 {
+			wg.Add(1)
+			wgCountLimit--
+			go func() {
+				defer func() {
+					defer wg.Done()
+					wgCountLimit++
+				}()
+				for _, creditID := range chunk {
+					url := fmt.Sprintf(baseCreditDetailsURL, creditID)
+					req, _ := http.NewRequest("GET", url, nil)
+					req.Header.Add("accept", "application/json")
+					req.Header.Add("Authorization", "Bearer "+token)
+					res, err := http.DefaultClient.Do(req)
+					if err != nil {
+						log.Fatal().Msg(err.Error())
+					}
+
+					defer res.Body.Close()
+					if res.StatusCode == http.StatusOK {
+						log.Info().Msg(fmt.Sprintf("Found %s", creditID))
+						body, _ := io.ReadAll(res.Body)
+						var bufJson MyJson
+						json.Unmarshal(body, &bufJson)
+						var credit models.Credit
+						credit.CreditID = bufJson["id"].(string)
+						credit.Details = bufJson
+						result := dbClient.Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "tmdb_id"}}, DoUpdates: clause.Assignments(MyJson{"details": credit.Details})}).Create(&credit)
+						if result.Error != nil {
+							log.Error().Msg(fmt.Sprintf("Failed to create the credit. %s", result.Error.Error()))
+						}
+					} else {
+						log.Info().Msg(res.Status)
+						if res.StatusCode == http.StatusTooManyRequests {
+							return
+						}
+					}
+					time.Sleep(1 * time.Millisecond)
+				}
+			}()
 		}
 	}
+	wg.Wait()
 }
 
 func main() {
@@ -233,5 +256,6 @@ func main() {
 	token = os.Getenv("TOKEN")
 	// scrapActors()
 	// scrapMovies()
-	scrapCreditsFromActors()
+	// scrapCreditsFromActors()
+	scrapCreditsFromMovies()
 }

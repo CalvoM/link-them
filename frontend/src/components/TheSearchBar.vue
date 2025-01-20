@@ -45,6 +45,7 @@ function getActors(event: AutoCompleteCompleteEvent) {
   )
 }
 function optSelect(event: AutoCompleteOptionSelectEvent) {
+  if (event.value < 0) return
   const i: number = mappedActors.value.indexOf(event.value)
   if (event.originalEvent.target?.id.startsWith('srcActor')) {
     srcActorPic.value = baseURL + mappedPics.value[i]

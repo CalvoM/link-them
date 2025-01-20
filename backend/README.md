@@ -1,6 +1,6 @@
 # link-them
 
-I am learning about graphs, so I making this app to learn how to do graphs in apps.
+I am learning about graphs, so I am making this app to learn how to implement graphs in applications.
 
 ## Plan
 
