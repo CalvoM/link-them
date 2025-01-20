@@ -21,8 +21,8 @@ func DBInit() *gorm.DB {
 	dbUser := os.Getenv("POSTGRES_USER")
 	dbPasswd := os.Getenv("POSTGRES_PASSWORD")
 	dbName := os.Getenv("POSTGRES_DB")
-	dbURL := fmt.Sprintf("postgres://%s:%s@%s:%s/%s", dbUser, dbPasswd, dbHost, dbPort, dbName)
-	dbClient, err := gorm.Open(postgres.Open(dbURL), &gorm.Config{})
+	dsn := fmt.Sprintf("postgres://%s:%s@%s:%s/%s", dbUser, dbPasswd, dbHost, dbPort, dbName)
+	dbClient, err := gorm.Open(postgres.Open(dsn), &gorm.Config{SkipDefaultTransaction: false})
 	if err != nil {
 		log.Fatal().Msg(err.Error())
 	}

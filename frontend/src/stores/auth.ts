@@ -12,17 +12,11 @@ export const useAuthStore = defineStore('auth', () => {
     return
   }
   async function postResource(url: string, resource: any) {
-    const data = await TokenHTTP.post(url, resource)
-    return data
-  }
-  function syncPostResource(url: string, resource: any) {
-    const data = TokenHTTP.post(url, resource)
-    return data
+    return await TokenHTTP.post(url, resource)
   }
   return {
     resourceData,
     getResource,
     postResource,
-    syncPostResource,
   }
 })
