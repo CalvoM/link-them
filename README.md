@@ -1,6 +1,6 @@
 # link-them
 
-I am learning about graphs, so I making this app to learn how to do graphs in apps.
+I am learning about graphs, so I am making this app to learn how to implement graphs in applications.
 
 ## Plan
 
@@ -18,3 +18,7 @@ I am learning about graphs, so I making this app to learn how to do graphs in ap
 - Backend  -> **Golang**
 - Database -> **Postgres** (*Through Docker*)
 - Background service -> **TBD**
+
+## Credits
+
+The data used is from [TMDB](https://www.themoviedb.org/)
