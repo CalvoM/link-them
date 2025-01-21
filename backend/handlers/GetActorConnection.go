@@ -53,8 +53,13 @@ func (h handler) GetActorConnection(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("500 Internal Server Error"))
 	}
-	common := lo.Intersect(srcMovieIDs, destMovieIDs)
-	fmt.Println(common)
+	commonMovieIDs := lo.Intersect(srcMovieIDs, destMovieIDs)
+	var movieIDs []string
+	result = h.dbClient.Table("movies").Select([]string{"title"}).Where("tmdb_id in ?", commonMovieIDs).Scan(&movieIDs)
+	if result.Error != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("500 Internal Server Error"))
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, "Query => %v", actorQuery)
