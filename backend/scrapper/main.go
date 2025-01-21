@@ -143,6 +143,7 @@ func scrapCreditsFromActors() {
 
 	creditsIDsChunks := slices.Chunk(remainingCreditIDs, 3000)
 	var wg sync.WaitGroup
+	// TMDB Rate limiting is 50 requests/sec
 	wgCountLimit := 50
 	for chunk := range creditsIDsChunks {
 		if wgCountLimit > 0 {
@@ -200,6 +201,7 @@ func scrapCreditsFromMovies() {
 
 	creditsIDsChunks := slices.Chunk(remainingCreditIDs, 4000)
 	var wg sync.WaitGroup
+	// TMDB Rate limiting is 50 requests/sec
 	wgCountLimit := 50
 	for chunk := range creditsIDsChunks {
 		if wgCountLimit > 0 {
