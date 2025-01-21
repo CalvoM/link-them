@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"net/http"
@@ -46,7 +47,6 @@ func scrapActors() {
 		}
 
 		defer res.Body.Close()
-		log.Info().Msg(res.Status)
 		if res.StatusCode == http.StatusOK {
 			body, _ := io.ReadAll(res.Body)
 			var bufJson MyJson
@@ -54,6 +54,7 @@ func scrapActors() {
 			var actor models.Actor
 			actor.Name = bufJson["name"].(string)
 			actor.ActorID = uint(bufJson["id"].(float64))
+			log.Info().Msg(fmt.Sprintf("Found Actor ID %d", actor.ActorID))
 			details := make(map[string]any)
 			details["also_known_as"] = bufJson["also_known_as"]
 			if bufJson["birthday"] == nil {
@@ -74,6 +75,12 @@ func scrapActors() {
 			if result.Error != nil {
 				log.Error().Msg(fmt.Sprintf("Failed to create the actor. %s", result.Error.Error()))
 			}
+		} else {
+			log.Info().Msg(res.Status)
+			if res.StatusCode == http.StatusTooManyRequests {
+				return
+			}
+
 		}
 		personID++
 	}
@@ -128,6 +135,9 @@ func scrapMovies() {
 			}
 		} else {
 			log.Info().Msg(res.Status)
+			if res.StatusCode == http.StatusTooManyRequests {
+				return
+			}
 		}
 		movieID++
 	}
@@ -138,7 +148,7 @@ func scrapCreditsFromActors() {
 	query := "select jsonb_path_query(details, '$.credits.cast[*].credit_id')->>0 from actors except tmdb_id from credits;"
 	result := dbClient.Raw(query).Scan(&remainingCreditIDs)
 	if result.Error != nil {
-		log.Info().Msg(result.Error.Error())
+		log.Fatal().Msg(result.Error.Error())
 	}
 
 	creditsIDsChunks := slices.Chunk(remainingCreditIDs, 3000)
@@ -196,7 +206,7 @@ func scrapCreditsFromMovies() {
 	query := "select jsonb_path_query(details, '$.credits.cast[*].credit_id')->>0 from movies except select tmdb_id from credits;"
 	result := dbClient.Raw(query).Scan(&remainingCreditIDs)
 	if result.Error != nil {
-		log.Info().Msg(result.Error.Error())
+		log.Fatal().Msg(result.Error.Error())
 	}
 
 	creditsIDsChunks := slices.Chunk(remainingCreditIDs, 4000)
@@ -256,8 +266,20 @@ func main() {
 	}
 	dbClient = DBInit()
 	token = os.Getenv("TOKEN")
-	// scrapActors()
-	// scrapMovies()
-	// scrapCreditsFromActors()
-	scrapCreditsFromMovies()
+	// availableCmds := []string{"actors", "movies", "actor_credits", "movie_credits"}
+	command := flag.String("command", "actors", "resource to scrap")
+	flag.Parse()
+	switch *command {
+	case "actors":
+		scrapActors()
+	case "movies":
+		scrapMovies()
+	case "actor_credits":
+		scrapCreditsFromActors()
+	case "movie_credits":
+		scrapCreditsFromMovies()
+	default:
+		log.Error().Msg("We do not support that option.")
+		fmt.Println("\u001b[31m We do not support that option.\u001b[0m")
+	}
 }
