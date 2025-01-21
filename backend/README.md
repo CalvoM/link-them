@@ -32,10 +32,11 @@ from the TMDB Api. If you would like to scrap for any data please run the follow
 ```
 
 The available options for **<CMD>** are:
-  a. actors
-  b. movies
-  c. actor_credits
-  d. movie_credits
+
+  1. actors
+  2. movies
+  3. actor_credits
+  4. movie_credits
 
 This will populate the DB with data so that it is possible to start the web server with data to display
 and analyze.
