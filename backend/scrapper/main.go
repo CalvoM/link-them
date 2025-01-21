@@ -78,6 +78,7 @@ func scrapActors() {
 		} else {
 			log.Info().Msg(res.Status)
 			if res.StatusCode == http.StatusTooManyRequests {
+				// Consider using a backoff algorithm
 				return
 			}
 
@@ -136,6 +137,7 @@ func scrapMovies() {
 		} else {
 			log.Info().Msg(res.Status)
 			if res.StatusCode == http.StatusTooManyRequests {
+				// Consider using a backoff algorithm
 				return
 			}
 		}
@@ -190,6 +192,7 @@ func scrapCreditsFromActors() {
 					} else {
 						log.Info().Msg(res.Status)
 						if res.StatusCode == http.StatusTooManyRequests {
+							// Consider using a backoff algorithm
 							return
 						}
 					}
@@ -248,6 +251,7 @@ func scrapCreditsFromMovies() {
 					} else {
 						log.Info().Msg(res.Status)
 						if res.StatusCode == http.StatusTooManyRequests {
+							// Consider using a backoff algorithm
 							return
 						}
 					}
