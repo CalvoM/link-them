@@ -6,11 +6,11 @@ I am learning about graphs, so I am making this app to learn how to implement gr
 
 ### Roadmap of tasks
 
-- [ ] Get movies
-- [ ] Get actors in movies
+- [x] Get movies
+- [x] Get actors in movies
 - [ ] Get connection between actors in same movie
 - [ ] Get connection between actors in different movies via other actors
-- [ ] Continuously update the records of movies and actors
+- [x] Continuously update the records of movies and actors
 
 ### Development
 

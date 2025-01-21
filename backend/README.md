@@ -47,3 +47,13 @@ Please run
   ```sh
   go run main.go
   ```
+
+## Resource connection
+
+We have 3 resources:
+
+1. Actors
+2. Movies
+3. Credits
+
+The actors and movies will form the nodes in the graph connections and the credits are the edges. We see that the connection between the movies and the actors is the *credits* resource.
