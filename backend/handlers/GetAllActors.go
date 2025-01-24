@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/CalvoM/link-them/models"
 )
@@ -29,7 +30,7 @@ func (h handler) GetAllActors(w http.ResponseWriter, r *http.Request) {
 func (h handler) GetSelectActors(w http.ResponseWriter, r *http.Request) {
 	var actors []models.ActorResultDetails
 	query := r.URL.Query().Get("query")
-	likeQuery := "%" + query + "%"
+	likeQuery := "%" + strings.ToLower(query) + "%"
 	result := h.dbClient.Raw("select name, tmdb_id, details->>'profile_picture' as profile_picture from actors where lower(name) like ?", likeQuery).Scan(&actors)
 	if result.Error != nil {
 		w.WriteHeader(http.StatusInternalServerError)

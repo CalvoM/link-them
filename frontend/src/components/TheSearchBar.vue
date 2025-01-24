@@ -9,9 +9,6 @@ import {
 import { ref, type Ref } from 'vue'
 const srcActor: Ref<string> = ref('')
 const destActor: Ref<string> = ref('')
-const props = defineProps<{
-  actors: Array<ActorAutocompleteDetails>
-}>()
 const emit = defineEmits<{
   submit: [srcActor: object, destActor: object]
 }>()
@@ -120,7 +117,7 @@ function optSelect(event: AutoCompleteOptionSelectEvent) {
       >Actor is needed
     </Message>
     <Button
-      label="Find link"
+      label="Find Common Movie"
       aria-label="Search"
       icon="pi pi-search"
       severity="success"
