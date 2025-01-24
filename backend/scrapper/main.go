@@ -33,116 +33,163 @@ var (
 )
 
 func scrapActors() {
-	personID := 70000
-	for personID < 80000 {
-		url := fmt.Sprintf(baseActorDetailsURL, strconv.Itoa(personID))
-		req, _ := http.NewRequest("GET", url, nil)
-
-		req.Header.Add("accept", "application/json")
-		req.Header.Add("Authorization", "Bearer "+token)
-
-		res, err := http.DefaultClient.Do(req)
-		if err != nil {
-			log.Fatal().Msg(err.Error())
-		}
-
-		defer res.Body.Close()
-		if res.StatusCode == http.StatusOK {
-			body, _ := io.ReadAll(res.Body)
-			var bufJson MyJson
-			json.Unmarshal(body, &bufJson)
-			var actor models.Actor
-			actor.Name = bufJson["name"].(string)
-			actor.ActorID = uint(bufJson["id"].(float64))
-			log.Info().Msg(fmt.Sprintf("Found Actor ID %d", actor.ActorID))
-			details := make(map[string]any)
-			details["also_known_as"] = bufJson["also_known_as"]
-			if bufJson["birthday"] == nil {
-				bufJson["birthday"] = ""
-			}
-			details["birthday"] = bufJson["birthday"].(string)
-			if bufJson["deathday"] == nil {
-				bufJson["deathday"] = ""
-			}
-			details["deathday"] = bufJson["deathday"].(string)
-			if bufJson["profile_path"] == nil {
-				bufJson["profile_path"] = ""
-			}
-			details["profile_picture"] = bufJson["profile_path"].(string)
-			details["credits"] = bufJson["credits"]
-			actor.Details = details
-			result := dbClient.Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "tmdb_id"}}, DoUpdates: clause.Assignments(MyJson{"details": details})}).Create(&actor)
-			if result.Error != nil {
-				log.Error().Msg(fmt.Sprintf("Failed to create the actor. %s", result.Error.Error()))
-			}
-		} else {
-			log.Info().Msg(res.Status)
-			if res.StatusCode == http.StatusTooManyRequests {
-				// Consider using a backoff algorithm
-				return
-			}
-
-		}
-		personID++
+	var storedIDs []uint
+	res := dbClient.Table("actors").Select("tmdb_id").Scan(&storedIDs)
+	if res.Error != nil {
+		log.Fatal().Msg(res.Error.Error())
 	}
+	start := 500000
+	var wg sync.WaitGroup
+	for start < 1000000 {
+		personID := start
+		nextPersonID := start + 10000
+		wg.Add(1)
+		go func() {
+			defer func() {
+				defer wg.Done()
+			}()
+			for personID < nextPersonID {
+				if slices.Contains(storedIDs, uint(personID)) {
+					log.Info().Msg(fmt.Sprintf("Skipping %d", personID))
+					personID++
+					continue
+				}
+				url := fmt.Sprintf(baseActorDetailsURL, strconv.FormatUint(uint64(personID), 10))
+				req, _ := http.NewRequest("GET", url, nil)
+
+				req.Header.Add("accept", "application/json")
+				req.Header.Add("Authorization", "Bearer "+token)
+
+				res, err := http.DefaultClient.Do(req)
+				if err != nil {
+					log.Fatal().Msg(err.Error())
+				}
+
+				defer res.Body.Close()
+				if res.StatusCode == http.StatusOK {
+					body, _ := io.ReadAll(res.Body)
+					var bufJson MyJson
+					json.Unmarshal(body, &bufJson)
+					var actor models.Actor
+					actor.Name = bufJson["name"].(string)
+					actor.ActorID = uint(bufJson["id"].(float64))
+					log.Info().Msg(fmt.Sprintf("Found Actor ID %d", actor.ActorID))
+					details := make(map[string]any)
+					details["also_known_as"] = bufJson["also_known_as"]
+					if bufJson["birthday"] == nil {
+						bufJson["birthday"] = ""
+					}
+					details["birthday"] = bufJson["birthday"].(string)
+					if bufJson["deathday"] == nil {
+						bufJson["deathday"] = ""
+					}
+					details["deathday"] = bufJson["deathday"].(string)
+					if bufJson["profile_path"] == nil {
+						bufJson["profile_path"] = ""
+					}
+					details["profile_picture"] = bufJson["profile_path"].(string)
+					details["credits"] = bufJson["credits"]
+					actor.Details = details
+					// result := dbClient.Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "tmdb_id"}}, DoUpdates: clause.Assignments(MyJson{"details": details})}).Create(&actor)
+					result := dbClient.Create(&actor)
+					if result.Error != nil {
+						log.Error().Msg(fmt.Sprintf("Failed to create the actor. %s", result.Error.Error()))
+					}
+				} else {
+					log.Info().Msg(res.Status)
+					if res.StatusCode == http.StatusTooManyRequests {
+						// Consider using a backoff algorithm
+						return
+					}
+
+				}
+				personID++
+			}
+		}()
+		start += 10000
+	}
+	wg.Wait()
 }
 
 func scrapMovies() {
-	movieID := 30853
-	for movieID < 50000 {
-		url := fmt.Sprintf(baseMovieDetailsURL, strconv.Itoa(movieID))
-		req, _ := http.NewRequest("GET", url, nil)
-		req.Header.Add("accept", "application/json")
-		req.Header.Add("Authorization", "Bearer "+token)
-
-		res, err := http.DefaultClient.Do(req)
-		if err != nil {
-			log.Fatal().Msg(err.Error())
-		}
-
-		defer res.Body.Close()
-		if res.StatusCode == http.StatusOK {
-			body, _ := io.ReadAll(res.Body)
-			var bufJson MyJson
-			json.Unmarshal(body, &bufJson)
-			var movie models.Movie
-			movie.Title = bufJson["title"].(string)
-			movie.MovieID = uint(bufJson["id"].(float64))
-			log.Info().Msg(fmt.Sprintf("Found movie ID %d", movie.MovieID))
-			details := make(map[string]any)
-			details["credits"] = bufJson["credits"]
-			if bufJson["status"] == nil {
-				// Default to released
-				bufJson["status"] = "Released"
-			}
-			details["status"] = bufJson["status"]
-			if bufJson["budget"] == nil {
-				bufJson["budget"] = 0
-			}
-			details["budget"] = bufJson["budget"]
-			if bufJson["revenue"] == nil {
-				bufJson["revenue"] = 0
-			}
-			details["revenue"] = bufJson["revenue"]
-			if bufJson["poster_path"] == nil {
-				bufJson["poster_path"] = ""
-			}
-			details["poster_picture"] = bufJson["poster_path"].(string)
-			details["credits"] = bufJson["credits"]
-			movie.Details = details
-			result := dbClient.Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "tmdb_id"}}, DoUpdates: clause.Assignments(MyJson{"details": details})}).Create(&movie)
-			if result.Error != nil {
-				log.Error().Msg(fmt.Sprintf("Failed to create the movie. %s", result.Error.Error()))
-			}
-		} else {
-			log.Info().Msg(res.Status)
-			if res.StatusCode == http.StatusTooManyRequests {
-				// Consider using a backoff algorithm
-				return
-			}
-		}
-		movieID++
+	var storedIDs []uint
+	res := dbClient.Table("movies").Select("tmdb_id").Scan(&storedIDs)
+	if res.Error != nil {
+		log.Fatal().Msg(res.Error.Error())
 	}
+	start := 100000
+	var wg sync.WaitGroup
+	for start < 500000 {
+		movieID := start
+		nextMovieID := start + 8000
+		wg.Add(1)
+		go func() {
+			defer func() { defer wg.Done() }()
+			for movieID < nextMovieID {
+				if slices.Contains(storedIDs, uint(movieID)) {
+					log.Info().Msg(fmt.Sprintf("Skipping %d", movieID))
+					movieID++
+					continue
+				}
+
+				url := fmt.Sprintf(baseMovieDetailsURL, strconv.Itoa(movieID))
+				req, _ := http.NewRequest("GET", url, nil)
+				req.Header.Add("accept", "application/json")
+				req.Header.Add("Authorization", "Bearer "+token)
+
+				res, err := http.DefaultClient.Do(req)
+				if err != nil {
+					log.Fatal().Msg(err.Error())
+				}
+
+				defer res.Body.Close()
+				if res.StatusCode == http.StatusOK {
+					body, _ := io.ReadAll(res.Body)
+					var bufJson MyJson
+					json.Unmarshal(body, &bufJson)
+					var movie models.Movie
+					movie.Title = bufJson["title"].(string)
+					movie.MovieID = uint(bufJson["id"].(float64))
+					log.Info().Msg(fmt.Sprintf("Found movie ID %d", movie.MovieID))
+					details := make(map[string]any)
+					details["credits"] = bufJson["credits"]
+					if bufJson["status"] == nil {
+						// Default to released
+						bufJson["status"] = "Released"
+					}
+					details["status"] = bufJson["status"]
+					if bufJson["budget"] == nil {
+						bufJson["budget"] = 0
+					}
+					details["budget"] = bufJson["budget"]
+					if bufJson["revenue"] == nil {
+						bufJson["revenue"] = 0
+					}
+					details["revenue"] = bufJson["revenue"]
+					if bufJson["poster_path"] == nil {
+						bufJson["poster_path"] = ""
+					}
+					details["poster_picture"] = bufJson["poster_path"].(string)
+					details["credits"] = bufJson["credits"]
+					movie.Details = details
+					// result := dbClient.Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "tmdb_id"}}, DoUpdates: clause.Assignments(MyJson{"details": details})}).Create(&movie)
+					result := dbClient.Create(&movie)
+					if result.Error != nil {
+						log.Error().Msg(fmt.Sprintf("Failed to create the movie. %s", result.Error.Error()))
+					}
+				} else {
+					log.Info().Msg(res.Status)
+					if res.StatusCode == http.StatusTooManyRequests {
+						// Consider using a backoff algorithm
+						return
+					}
+				}
+				movieID++
+			}
+		}()
+		start += 8000
+	}
+	wg.Wait()
 }
 
 func scrapCreditsFromActors() {

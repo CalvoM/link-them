@@ -16,6 +16,13 @@ type ActorsConnectionQuery struct {
 	DestActorID uint   `json:"destActorID"`
 }
 
+type MovieDetails struct {
+	Title         string `json:"title"`
+	Tmdb_id       uint   `json:"id"`
+	Status        string `json:"status"`
+	PosterPicture string `json:"poster_picture"`
+}
+
 func (h handler) GetActorConnection(w http.ResponseWriter, r *http.Request) {
 	var actorQuery ActorsConnectionQuery
 	err := json.NewDecoder(r.Body).Decode(&actorQuery)
@@ -54,13 +61,15 @@ func (h handler) GetActorConnection(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("500 Internal Server Error"))
 	}
 	commonMovieIDs := lo.Intersect(srcMovieIDs, destMovieIDs)
-	var movieIDs []string
-	result = h.dbClient.Table("movies").Select([]string{"title"}).Where("tmdb_id in ?", commonMovieIDs).Scan(&movieIDs)
+	var movieDetails []MovieDetails
+	selectQuery := []string{"title", "tmdb_id", "jsonb_path_query(details, '$.status')->>0 as status", "jsonb_path_query(details, '$.poster_picture')->>0 as poster_picture"}
+	result = h.dbClient.Table("movies").Select(selectQuery).Where("tmdb_id in ?", commonMovieIDs).Scan(&movieDetails)
 	if result.Error != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("500 Internal Server Error"))
 	}
+	fmt.Println(movieDetails)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, "Query => %v", actorQuery)
+	json.NewEncoder(w).Encode(movieDetails)
 }
