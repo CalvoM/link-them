@@ -1,0 +1,17 @@
+Link Them Interaction: {
+  shape: sequence_diagram
+  TMDB: TMDB Api
+  Frontend: Frontend
+  Backend: Backend
+  client interaction: {
+    Frontend -> Backend: GET /actors?query=<partial_or_full_actor_name>
+    Backend -> Frontend: details of actors with name or partial name
+    Frontend -> Backend: POST /actors
+    Backend -> Frontend: actor movie connection
+  }
+  scrapping interaction: {
+    Backend -> TMDB: GET /person/<person_id>?append_to_response=credits
+    Backend -> TMDB: GET /movie/<movie_id>?append_to_response=credits
+    Backend -> TMDB: GET /credits/<credit_id>
+  }
+}

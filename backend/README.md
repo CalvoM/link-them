@@ -49,12 +49,21 @@ Please run
   go run main.go
   ```
 
-## Resource connection
+## Design Specification
 
-We have 3 resources:
+Please read the specification [here](https://docs.google.com/document/d/1M2wU7mJmwb-g56dbN7Okx5ViCS9QEb0JLQU8T8oMuy4/edit?usp=sharing)
 
-1. Actors
-2. Movies
-3. Credits
+## Documentation
 
-The actors and movies will form the nodes in the graph connections and the credits are the edges. We see that the connection between the movies and the actors is the *credits* resource.
+In addition to this **README**, we have **docs/** that has our d2 files that illustrate the various components and how they interact.
+To run the d2 files:
+
+1. Please install d2lang cli from the [instructions](https://d2lang.com/tour/install/)
+2. Inside the **docs** folder please run
+
+    ```sh
+    d2 --watch <d2_file>
+    ```
+
+    Where **d2_file** is any of the d2 files in the **docs/** folder
+3. Open the browser on the port used as stated in the logs.
