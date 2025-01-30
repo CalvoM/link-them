@@ -1,0 +1,20 @@
+actors: {
+  shape: sql_table
+  id: int {constraint: primary_key}
+  name: string
+  tmdb_id: int {constraint: unique}
+  details: jsonb
+}
+movies: {
+  shape: sql_table
+  id: int {constraint: primary_key}
+  title: string
+  tmdb_id: int {constraint: unique}
+  details: jsonb
+}
+credits: {
+  shape: sql_table
+  id: int {constraint: primary_key}
+  tmdb_id: string {constraint: unique}
+  details: jsonb
+}
