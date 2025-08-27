@@ -21,6 +21,7 @@
     "pinia": "^2.3.0",
     "postcss-import": "^16.1.0",
     "primevue": "^4.2.5",
+    "relation-graph-vue3": "^2.2.10",
     "tailwindcss-primeui": "^0.3.4",
     "vue": "^3.5.13",
     "vue-router": "^4.5.0"

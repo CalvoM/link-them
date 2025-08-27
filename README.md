@@ -8,7 +8,7 @@ I am learning about graphs, so I am making this app to learn how to implement gr
 
 - [x] Get movies
 - [x] Get actors in movies
-- [ ] Get connection between actors in same movie
+- [x] Get connection between actors in same movie
 - [ ] Get connection between actors in different movies via other actors
 - [x] Continuously update the records of movies and actors
 

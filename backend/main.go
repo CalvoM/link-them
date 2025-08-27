@@ -16,7 +16,7 @@ func main() {
 	h := handlers.New(db.Init())
 	r := mux.NewRouter()
 	apiV1 := r.PathPrefix("/api/v1").Subrouter()
-	apiV1.HandleFunc("/actors", h.GetAllActors).Methods(http.MethodGet)
+	apiV1.HandleFunc("/actors", h.GetSelectActors).Methods(http.MethodGet)
 	apiV1.HandleFunc("/actors", h.GetActorConnection).Methods(http.MethodPost)
 	srv := &http.Server{
 		Handler: r,
