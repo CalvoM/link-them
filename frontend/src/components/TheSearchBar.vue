@@ -28,7 +28,7 @@ function search() {
   clickedSubmit.value = true
   emit('submit', srcActorObj.value, destActorObj.value)
 }
-async function getActors(event: AutoCompleteCompleteEvent) {
+const getActors = debounce(async (event: AutoCompleteCompleteEvent) => {
   if (event.query.length < 2) {
     return []
   }
@@ -43,7 +43,7 @@ async function getActors(event: AutoCompleteCompleteEvent) {
   suggestedActors.value = mappedActors.value.filter((actor: string) =>
     actor.toLowerCase().includes(event.query.toLowerCase()),
   )
-}
+}, 300)
 function optSelect(event: AutoCompleteOptionSelectEvent) {
   if (event.value < 0) return
   const i: number = mappedActors.value.indexOf(event.value)
@@ -70,6 +70,15 @@ function optSelect(event: AutoCompleteOptionSelectEvent) {
         destActor: actor.name,
         destActorID: actor.id,
       }))[0]
+  }
+}
+function debounce(func: any, delay: number) {
+  let timeoutId: number
+  return function (...args) {
+    clearTimeout(timeoutId)
+    timeoutId = setTimeout(() => {
+      func(...args)
+    }, delay)
   }
 }
 </script>
